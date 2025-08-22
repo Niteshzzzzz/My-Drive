@@ -6,12 +6,13 @@ import fileRoutes from "./routes/fileRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import checkAuth from "./middlewares/authMiddleware.js";
 import { connectDB } from "./config/db.js";
+const secretKey = 'my_signed_cookie'
 
 try {
   await connectDB();
 
   const app = express();
-  app.use(cookieParser());
+  app.use(cookieParser(secretKey));
   app.use(express.json());
   app.use(
     cors({
