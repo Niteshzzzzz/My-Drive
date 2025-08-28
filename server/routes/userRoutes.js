@@ -1,6 +1,6 @@
 import express from "express";
 import checkAuth from "../middlewares/authMiddleware.js";
-import { login, logout, register } from "../controllers/userController.js";
+import { login, logout, logoutAll, register } from "../controllers/userController.js";
 
 const router = express.Router();
 
@@ -16,5 +16,7 @@ router.get("/", checkAuth, (req, res) => {
 });
 
 router.post("/logout", logout);
+
+router.post("/logout-all", logoutAll);
 
 export default router;
