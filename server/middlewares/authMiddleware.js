@@ -18,3 +18,13 @@ export default async function checkAuth(req, res, next) {
   req.user = user;
   next();
 }
+
+export const checkNotNormalUser = (req, res, next) => {
+  if(req.user.role !== 'User') return next();
+  return res.status(403).json({error: 'Not authorized to logout users!!!'})
+}
+
+export const checkAdminUser = (req, res, next) => {
+  if(req.user.role === 'Admin') return next();
+  return res.status(403).json({error: 'Not authorized to delete users!!!'})
+}
