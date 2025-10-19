@@ -174,7 +174,8 @@ function DirectoryHeader({
             title="User Menu"
             onClick={handleUserIconClick}
           >
-            { picture ? <img src={picture} alt={userName} className="userPic" /> : <FaUser />}
+            {/* { picture ? <img src={picture} alt={userName} className="userPic" /> : <FaUser />} */}
+            <FaUser />
           </button>
 
           {showUserMenu && (

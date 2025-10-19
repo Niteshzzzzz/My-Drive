@@ -9,9 +9,9 @@ const Register = () => {
   const BASE_URL = "http://localhost:4000";
 
   const [formData, setFormData] = useState({
-    name: "Nitesh Kumar",
-    email: "niteshkr1661@gmail.com",
-    password: "abcd",
+    name: "",
+    email: "",
+    password: "",
   });
 
   const [serverError, setServerError] = useState("");

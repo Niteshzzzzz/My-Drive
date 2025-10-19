@@ -5,7 +5,7 @@ dotenv.config()
 
 const url = process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 
-const redisClient = createClient({ url })
+const redisClient = createClient({ url, password: process.env.REDIS_PASSWORD })
 
 redisClient.on('error', (err) => console.error('Redis Client Error', err))
 

@@ -6,13 +6,41 @@ import bcrypt from 'bcrypt'
 import Session from "../models/sessionModel.js";
 import { verifyIdToken } from "../services/googleAuthService.js";
 import axios, { all } from 'axios'
+import redisClient from "../config/redis.js";
+import { loginSchema, registerSchema } from '../validators/authValidator.js'
+import { z } from "zod/v4";
+import OTP from "../models/otpModel.js";
+import { JSDOM } from 'jsdom';
+import DOMPurify from 'dompurify';
+
+const window = new JSDOM('').window;
+const purify = DOMPurify(window);
 
 export const register = async (req, res, next) => {
-  const { name, email, password } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 12)
-  const session = await mongoose.startSession();
+  // console.log(req.body)
+  const { success, data, error } = registerSchema.safeParse(req.body)
+  if (!success) {
+    console.log(error)
+    return res.status(400).json({ error: 'something went wrong.' })
+    // return res.status(400).json({ error: z.flattenError(error).fieldErrors })
+  }
+  console.log(data)
+  data.name = purify.sanitize(data.name);
+  const { name, email, password, otp } = data;
+  console.log(data)
+  const otpRecord = await OTP.findOne({ email, otp });
 
+  if (!otpRecord) {
+    return res.status(400).json({ error: "Invalid or Expired OTP!" });
+  }
+
+  await otpRecord.deleteOne();
+
+  const session = await mongoose.startSession();
+  
   try {
+
+    const hashedPassword = await bcrypt.hash(password, 12)
     const rootDirId = new Types.ObjectId();
     const userId = new Types.ObjectId();
 
@@ -44,8 +72,8 @@ export const register = async (req, res, next) => {
 
     res.status(201).json({ message: "User Registered" });
   } catch (err) {
-  await session.abortTransaction();
-  session.endSession();
+    await session.abortTransaction();
+    session.endSession();
 
     if (err.code === 121) {
       res
@@ -65,30 +93,46 @@ export const register = async (req, res, next) => {
 }
 
 export const login = async (req, res, next) => {
-  const { email, password } = req.body;
+  const { success, data, error } = loginSchema.safeParse(req.body)
+  if (!success) {
+    return res.status(400).json({ error: 'invalid credentials!' })
+  }
+
+  const { email, password } = data
   try {
     const user = await User.findOne({ email });
-    if (user.deleted) return res.status(403).json({ error: 'Your account have been deleted. Please contact to the admin for recover!' })
-
     if (!user) {
       return res.status(404).json({ error: "Invalid Credentials" });
     }
+
+    if (user.deleted) return res.status(403).json({ error: 'Your account have been deleted. Please contact to the admin for recover!' })
+
+    console.log(user)
     const isValidPassword = await bcrypt.compare(password, user.password)
     if (!isValidPassword) {
       return res.status(404).json({ error: "Invalid Credentials" });
     }
 
-    const allSessions = await Session.find({ userId: user.id })
-    if (allSessions.length >= 2) {
-      await allSessions[0].deleteOne()
+    const allSessions = await redisClient.ft.search("userIdIdx", `@userId:{${user.id}}`, {
+      RETURN: []
+    });
+
+    if (allSessions.total >= 2) {
+      await redisClient.del(allSessions.documents[0].id)
     }
 
-    const session = await Session.create({ userId: user._id })
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    await redisClient.json.set(redisKey, '$', { userId: user._id, rootDirId: user.rootDirId })
 
-    res.cookie("sid", session.id, {
+    const sessionExpiry = 60 * 60 * 24 * 7; // 7 days in seconds
+    await redisClient.expire(redisKey, sessionExpiry);
+
+    res.cookie("sid", sessionId, {
       httpOnly: true,
+      sameSite: 'lax',
       signed: true,
-      maxAge: 60 * 1000 * 60 * 24 * 7,
+      maxAge: sessionExpiry * 1000
     });
     res.json({ message: "logged in" });
   } catch (error) {
@@ -98,7 +142,8 @@ export const login = async (req, res, next) => {
 
 export const logout = async (req, res) => {
   const { sid } = req.signedCookies;
-  await Session.findByIdAndDelete(sid)
+  // await Session.findByIdAndDelete(sid)
+  await redisClient.del(`session:${sid}`)
   res.clearCookie("sid");
   res.status(204).end();
 }
@@ -115,20 +160,29 @@ export const loginWithGoogle = async (req, res, next) => {
   const { idToken } = req.body
   const { email, name, picture, sub } = await verifyIdToken(idToken)
   const user = await User.findOne({ email })
-  if (user.deleted) return res.status(403).json({ error: 'Your account have been deleted. Please contact to the admin for recover!' })
   if (user) {
-    const allSessions = await Session.find({ userId: user.id })
-    if (allSessions.length >= 2) {
-      await allSessions[0].deleteOne()
+    if (user.deleted) return res.status(403).json({ error: 'Your account have been deleted. Please contact to the admin for recover!' })
+    const allSessions = await redisClient.ft.search("userIdIdx", `@userId:{${user.id}}`, {
+      RETURN: []
+    });
+
+    if (allSessions.total >= 2) {
+      await redisClient.del(allSessions.documents[0].id)
     }
     if (!user.picture.includes('googleusercontent.com')) {
       user.picture = picture;
       await user.save()
     }
-    const session = await Session.create({ userId: user._id })
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    await redisClient.json.set(redisKey, '$', { userId: user._id, rootDirId: user.rootDirId })
 
-    res.cookie("sid", session.id, {
+    const sessionExpiry = 60 * 60 * 24 * 7; // 7 days in seconds
+    await redisClient.expire(redisKey, sessionExpiry);
+
+    res.cookie("sid", sessionId, {
       httpOnly: true,
+      sameSite: 'lax',
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
@@ -163,21 +217,27 @@ export const loginWithGoogle = async (req, res, next) => {
       { session: mongooseSession }
     );
 
-  const session = await Session.create({ userId: userId })
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    await redisClient.json.set(redisKey, '$', { userId: userId, rootDirId: rootDirId })
 
-    res.cookie("sid", session.id, {
+    const sessionExpiry = 60 * 60 * 24 * 7; // 7 days in seconds
+    await redisClient.expire(redisKey, sessionExpiry);
+
+    res.cookie("sid", sessionId, {
       httpOnly: true,
+      sameSite: 'lax',
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
 
-  await mongooseSession.commitTransaction();
-  mongooseSession.endSession();
+    await mongooseSession.commitTransaction();
+    mongooseSession.endSession();
 
     res.status(201).json({ message: "User Registered" });
   } catch (err) {
-  await mongooseSession.abortTransaction();
-  mongooseSession.endSession();
+    await mongooseSession.abortTransaction();
+    mongooseSession.endSession();
 
     if (err.code === 121) {
       res
@@ -248,18 +308,27 @@ export const gitHubCallback = async (req, res, next) => {
     if (user.deleted) return res.status(403).json({ error: 'Your account have been deleted. Please contact to the admin for recover!' })
 
     if (user) {
-      const allSessions = await Session.find({ userId: user.id })
-      if (allSessions.length >= 2) {
-        await allSessions[0].deleteOne()
+      const allSessions = await redisClient.ft.search("userIdIdx", `@userId:{${user.id}}`, {
+        RETURN: []
+      });
+
+      if (allSessions.total >= 2) {
+        await redisClient.del(allSessions.documents[0].id)
       }
       if (!user.picture.includes('githubusercontent.com')) {
         user.picture = picture;
         await user.save()
       }
-      const session = await Session.create({ userId: user._id })
+      const sessionId = crypto.randomUUID();
+      const redisKey = `session:${sessionId}`;
+      const session = await redisClient.json.set(redisKey, '$', { userId: user._id, rootDirId: user.rootDirId })
 
-      res.cookie("sid", session.id, {
+      const sessionExpiry = 60 * 60 * 24 * 7; // 7 days in seconds
+      await redisClient.expire(redisKey, sessionExpiry);
+
+      res.cookie("sid", sessionId, {
         httpOnly: true,
+        sameSite: 'lax',
         signed: true,
         maxAge: 60 * 1000 * 60 * 24 * 7,
       });
@@ -297,16 +366,22 @@ export const gitHubCallback = async (req, res, next) => {
       { session: mongooseSession }
     );
 
-    const session = await Session.create({ userId: userId })
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    const session = await redisClient.json.set(redisKey, '$', { userId: userId, rootDirId: rootDirId })
 
-    res.cookie("sid", session.id, {
+    const sessionExpiry = 60 * 60 * 24 * 7; // 7 days in seconds
+    await redisClient.expire(redisKey, sessionExpiry);
+
+    res.cookie("sid", sessionId, {
       httpOnly: true,
+      sameSite: 'lax',
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
 
-  await mongooseSession.commitTransaction();
-  mongooseSession.endSession();
+    await mongooseSession.commitTransaction();
+    mongooseSession.endSession();
 
     res.send(`
       <script>
@@ -315,8 +390,8 @@ export const gitHubCallback = async (req, res, next) => {
       </script>
     `);
   } catch (err) {
-  await mongooseSession.abortTransaction();
-  mongooseSession.endSession();
+    await mongooseSession.abortTransaction();
+    mongooseSession.endSession();
 
     if (err.code === 121) {
       res
@@ -357,7 +432,7 @@ export const logoutById = async (req, res, next) => {
 export const deleteUser = async (req, res, next) => {
   try {
     const { userId } = req.params
-    if(req.user._id.toString() === userId) return res.status(403).json({error: 'You cannot delete yourself!'})
+    if (req.user._id.toString() === userId) return res.status(403).json({ error: 'You cannot delete yourself!' })
     await Session.deleteMany({ userId })
     await User.findByIdAndUpdate(userId, { deleted: true })
     // await File.deleteMany({userId})

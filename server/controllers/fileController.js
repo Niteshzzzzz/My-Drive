@@ -59,7 +59,7 @@ export const serveFile = async (req, res) => {
 
   // If "download" is requested, set the appropriate headers
   const filePath = `${process.cwd()}/storage/${id}${fileData.extension}`;
-
+  console.log(filePath)
   if (req.query.action === "download") {
     return res.download(filePath, fileData.name);
   }

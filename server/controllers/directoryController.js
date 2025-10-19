@@ -1,11 +1,16 @@
 import { rm } from "fs/promises";
 import Directory from '../models/directoryModel.js'
 import File from '../models/fileModel.js'
+import { JSDOM } from 'jsdom';
+import DOMPurify from 'dompurify';
+
+const window = new JSDOM('').window;
+const purify = DOMPurify(window);
 
 export const getDirectory = async (req, res) => {
     const user = req.user;
     const _id = req.params.id || user.rootDirId;
-    const directoryData = await Directory.findOne({ _id });
+    const directoryData = await Directory.findOne({ _id, userId: user._id }).lean();
     if (!directoryData) {
         return res
             .status(404)
@@ -24,7 +29,8 @@ export const getDirectory = async (req, res) => {
 export const createDirectory = async (req, res, next) => {
     const user = req.user;
     const parentDirId = req.params.parentDirId || user.rootDirId;
-    const dirname = req.headers.dirname || "New Folder";
+    const sanitizedDirname = purify.sanitize(req.headers.dirname);
+    const dirname = sanitizedDirname || "New Folder";
     try {
         const parentDir = await Directory.findById(parentDirId);
         if (!parentDir)
@@ -52,13 +58,14 @@ export const updateDirectory = async (req, res, next) => {
     const user = req.user;
     const { id } = req.params;
     const { newDirName } = req.body;
+    const sanitizedDirname = purify.sanitize(newDirName);
     try {
         await Directory.findOneAndUpdate(
             {
                 _id: id,
                 userId: user._id,
             },
-            { name: newDirName }
+            { name: sanitizedDirname }
         );
         res.status(200).json({ message: "Directory Renamed!" });
     } catch (err) {
