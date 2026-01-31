@@ -162,7 +162,7 @@ export const deleteFile = async (req, res, next) => {
 
   try {
     await file.deleteOne()
-    await folderSizeHandler(file.parentDirId, Number(-file.size));
+    await folderSizeHandler(file.parentDirId, -file.size);
     await rm(`./storage/${id}${file.extension}`);
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
