@@ -3,6 +3,7 @@ import Directory from '../models/directoryModel.js'
 import File from '../models/fileModel.js'
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
+import { folderSizeHandler } from "./fileController.js";
 
 const window = new JSDOM('').window;
 const purify = DOMPurify(window);
@@ -82,7 +83,7 @@ export const deleteDirectory = async (req, res, next) => {
                 _id: dirObjId,
                 userId: req.user._id,
             }
-        ).select('_id');
+        );
 
         if (!directoryData) {
             return res.status(404).json({ error: "Directory not found!" });
@@ -116,6 +117,8 @@ export const deleteDirectory = async (req, res, next) => {
         await Directory.deleteMany({
             _id: { $in: [...directories.map(({ _id }) => _id), dirObjId] },
         });
+
+        await folderSizeHandler(directoryData.parentDirId, -directoryData.size);
     } catch (error) {
         next(error)
     }

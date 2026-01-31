@@ -29,15 +29,16 @@ export const register = async (req, res, next) => {
   const { name, email, password, otp } = data;
   console.log(data)
   const otpRecord = await OTP.findOne({ email, otp });
+  console.log(otpRecord)
 
   if (!otpRecord) {
-    return res.status(400).json({ error: "Invalid or Expired OTP!" });
+    return res.status(400).json({ error: "Invalid or Expired OTP1!" });
   }
 
   await otpRecord.deleteOne();
 
   const session = await mongoose.startSession();
-  
+
   try {
 
     const hashedPassword = await bcrypt.hash(password, 12)
@@ -74,6 +75,7 @@ export const register = async (req, res, next) => {
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
+    // console.log(err.errorResponse.errInfo.details.schemaRulesNotSatisfied[0].propertiesNotSatisfied[0].details[0])
 
     if (err.code === 121) {
       res
@@ -408,7 +410,26 @@ export const gitHubCallback = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   const allUsers = await User.find({ deleted: false }).lean()
-  const allSessions = await Session.find().select('userId').lean()
+  // const allSessions = await Session.find().select('userId').lean()
+
+  // finding all sessions from the redis
+  let cursor = "0";
+  const allSessions = [];
+
+  do {
+    const reply = await redisClient.scan(cursor, {
+      MATCH: "session:*",
+      COUNT: 100
+    });
+
+    cursor = reply.cursor;
+
+    for (const key of reply.keys) {
+      const session = await redisClient.json.get(key, ".");
+      allSessions.push(session);
+    }
+  } while (cursor !== "0");
+
   const allSessionsId = allSessions.map(({ userId }) => userId.toString())
   const allSessionsIdSet = new Set(allSessionsId)
   const allFinalUsers = allUsers.map(({ _id, name, email }) => ({
@@ -422,7 +443,30 @@ export const getAllUsers = async (req, res, next) => {
 
 export const logoutById = async (req, res, next) => {
   try {
-    await Session.deleteMany({ userId: req.params.userId })
+    // await Session.deleteMany({ userId: req.params.userId })
+    const userId = req.params.userId
+
+    //finding and deleate that session which has same userId
+    let cursor = "0";
+
+    do {
+      const { cursor: nextCursor, keys } = await redisClient.scan(cursor, {
+        MATCH: "session:*",
+        COUNT: 100
+      });
+
+      cursor = nextCursor;
+
+      for (const key of keys) {
+        const session = await redisClient.json.get(key, ".");
+        if (session?.userId === userId) {
+          await redisClient.del(key);
+          console.log("Deleted session:", key);
+          break; // 👈 STOP after deleting one
+        }
+      }
+    } while (cursor !== "0");
+
     res.status(204).json({ message: 'User logged out success.' })
   } catch (error) {
     next(error)

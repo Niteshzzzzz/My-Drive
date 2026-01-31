@@ -36,11 +36,6 @@ try {
     limit: 50
   })
 
-  const userLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000,
-    limit: 10,
-  })
-
   app.use(limiter)
 
   // function throttle(waitTime = 1000) {
@@ -72,7 +67,7 @@ try {
 
   app.use("/directory", checkAuth, directoryRoutes);
   app.use("/file", checkAuth, fileRoutes);
-  app.use("/", userLimiter, userRoutes);
+  app.use("/", userRoutes);
   app.use("/auth", authRoutes);
 
   app.use((err, req, res, next) => {

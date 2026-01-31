@@ -30,6 +30,11 @@ const userSchema = new Schema({
         enum: ['User', 'Manager', 'Admin'],
         default: 'User'
     },
+    maxStorageInBytes: {
+        type: Number,
+        require: true,
+        default: 1 * 1024 ** 3 // 1 GB
+    },
     deleted: {
         type: Boolean,
         default: false

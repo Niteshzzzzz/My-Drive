@@ -4,6 +4,16 @@ import path from "path";
 import Directory from '../models/directoryModel.js'
 import File from '../models/fileModel.js'
 
+export async function folderSizeHandler(parentDirId, deltaSize) {
+  let parentId = parentDirId;
+  while (parentId) {
+    const dir = await Directory.findById(parentId);
+    dir.size += deltaSize;
+    await dir.save();
+    parentId = dir.parentDirId;
+  }
+}
+
 export const uploadFile = async (req, res, next) => {
   const parentDirId = req.params.parentDirId || req.user.rootDirId;
   try {
@@ -18,11 +28,23 @@ export const uploadFile = async (req, res, next) => {
     }
 
     const filename = req.headers.filename || "untitled";
+    const filesize = req.headers.filesize;
     const extension = path.extname(filename);
+
+    const maxStorageInBytes = req.user.maxStorageInBytes;
+    const usedStorageInBytes = await Directory.findById(req.user.rootDirId).select('size').lean();
+
+    if (filesize > (maxStorageInBytes - usedStorageInBytes.size)) {
+      res.destroy();
+      return res.end();
+      // res.setHeader("Connection", "close");
+      // return res.status(413).json({ error: "File size exceeds the 50MB limit." });
+    }
 
     const insertedFile = await File.insertOne({
       extension,
       name: filename,
+      size: filesize,
       parentDirId: parentDirData._id,
       userId: req.user._id,
     });
@@ -30,11 +52,44 @@ export const uploadFile = async (req, res, next) => {
 
     const fullFileName = `${fileId}${extension}`;
 
-    const writeStream = createWriteStream(`./storage/${fullFileName}`);
-    req.pipe(writeStream);
+    const filePath = `./storage/${fullFileName}`;
+    const writeStream = createWriteStream(filePath);
+    // req.pipe(writeStream);
+
+    let totalFileSize = 0;
+    let aborted = false;
+    let fileUploadCompleted = false;
+
+    req.on("data", async (chunk) => {
+      if (aborted) return;
+      totalFileSize += chunk.length;
+      if (totalFileSize > filesize) {
+        aborted = true;
+        writeStream.close();
+        await insertedFile.deleteOne();
+        await rm(filePath);
+        return req.destroy();
+      }
+      writeStream.write(chunk);
+
+    });
 
     req.on("end", async () => {
+      fileUploadCompleted = true;
+      await folderSizeHandler(parentDirId, totalFileSize);
       return res.status(201).json({ message: "File Uploaded" });
+    });
+
+    req.on("close", async () => {
+      if (!fileUploadCompleted) {
+        try {
+          await insertedFile.deleteOne();
+          await rm(filePath);
+          console.log("file cleaned");
+        } catch (err) {
+          console.error("Error cleaning up aborted upload:", err);
+        }
+      }
     });
 
     req.on("error", async () => {
@@ -59,7 +114,7 @@ export const serveFile = async (req, res) => {
 
   // If "download" is requested, set the appropriate headers
   const filePath = `${process.cwd()}/storage/${id}${fileData.extension}`;
-  console.log(filePath)
+
   if (req.query.action === "download") {
     return res.download(filePath, fileData.name);
   }
@@ -100,14 +155,17 @@ export const deleteFile = async (req, res, next) => {
     _id: id,
     userId: req.user._id,
   });
+  // Update folder sizes
+  await folderSizeHandler(file.parentDirId, -file.size);
 
   if (!file) {
     return res.status(404).json({ error: "File not found!" });
   }
 
   try {
-    await rm(`./storage/${id}${file.extension}`);
     await file.deleteOne()
+    await folderSizeHandler(file.parentDirId, -file.size);
+    await rm(`./storage/${id}${file.extension}`);
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
     next(err);

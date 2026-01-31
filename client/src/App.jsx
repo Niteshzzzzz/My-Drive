@@ -4,6 +4,8 @@ import Register from "./Register";
 import "./App.css";
 import Login from "./Login";
 import UsersPage from "./UsersPage";
+import Error from "./components/Error";
+import Converter from "./components/Converter";
 
 const router = createBrowserRouter([
   {
@@ -11,21 +13,29 @@ const router = createBrowserRouter([
     element: <DirectoryView />,
   },
   {
-    path: "/register",
-    element: <Register />,
+    path: "/converter",
+    element: <Converter />,
   },
   {
-    path: "/users",
-    element: <UsersPage />,
+    path: "/register",
+    element: <Register />,
   },
   {
     path: "/login",
     element: <Login />,
   },
   {
+    path: "/users",
+    element: <UsersPage />,
+  },
+  {
     path: "/directory/:dirId",
     element: <DirectoryView />,
   },
+  {
+    path: "/error",
+    element: <Error/>
+  }
 ]);
 
 function App() {

@@ -9,6 +9,10 @@ const fileSchema = new Schema({
         type: String,
         require: true
     },
+    size: {
+        type: Number,
+        require: true
+    },
     parentDirId: {
         type: Schema.Types.ObjectId,
         require: true,
@@ -20,7 +24,8 @@ const fileSchema = new Schema({
         ref: 'User'
     }
 }, {
-    statics: 'throw'
+    statics: 'throw',
+    timestamps: true
 })
 
 const File = model('File', fileSchema)
