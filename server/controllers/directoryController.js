@@ -4,6 +4,7 @@ import File from '../models/fileModel.js'
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
 import { folderSizeHandler } from "./fileController.js";
+import { deleteS3Files } from "../services/s3.js";
 
 const window = new JSDOM('').window;
 const purify = DOMPurify(window);
@@ -106,9 +107,14 @@ export const deleteDirectory = async (req, res, next) => {
 
         const { files, directories } = await getDirectoryContents(dirObjId);
 
-        for (const { _id, extension } of files) {
-            await rm(`./storage/${_id.toString()}${extension}`);
-        }
+        // for (const { _id, extension } of files) {
+        //     await rm(`./storage/${_id.toString()}${extension}`);
+        // }
+
+        const keys = files.map(({_id, extension}) => ({Key: encodeURIComponent(_id)+extension}))
+
+        // console.log(keys)
+        await deleteS3Files(keys)
 
         await File.deleteMany({
             _id: { $in: files.map(({ _id }) => _id) },

@@ -13,7 +13,7 @@ import {
   renameDirectory,
 } from "./api/directoryApi";
 
-import { deleteFile, renameFile } from "./api/fileApi";
+import { deleteFile, renameFile, uploadComplete, uploadInitiate } from "./api/fileApi";
 import DetailsPopup from "./components/DetailsPopup";
 import ConfirmDeleteModal from "./components/ConfirmDeleteModel";
 
@@ -100,7 +100,7 @@ function DirectoryView() {
     else window.location.href = `http://localhost:4000/file/${id}`;
   }
 
-  function handleFileSelect(e) {
+  async function handleFileSelect(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -120,22 +120,30 @@ function DirectoryView() {
       progress: 0,
     };
 
-    // Optimistically show the file in the list
-    setFilesList((prev) => [tempItem, ...prev]);
-    setUploadItem(tempItem);
-    e.target.value = "";
+    try {
+      const { url, fileId } = await uploadInitiate({
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+        parentDirId: dirId
+      })
+      // Optimistically show the file in the list
+      setFilesList((prev) => [tempItem, ...prev]);
+      setUploadItem(tempItem);
+      e.target.value = "";
 
-    startUpload(tempItem);
+      startUpload({ tempItem, url, fileId });
+    } catch (error) {
+      setErrorMessage(error.response.data.error);
+      setTimeout(() => setErrorMessage(""), 3000);
+    }
   }
 
-  function startUpload(item) {
+  function startUpload({ tempItem: item, url, fileId }) {
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
 
-    xhr.open("POST", `http://localhost:4000/file/${dirId || ""}`);
-    xhr.withCredentials = true;
-    xhr.setRequestHeader("filename", item.name);
-    xhr.setRequestHeader("filesize", item.size);
+    xhr.open("PUT", url);
 
     xhr.upload.addEventListener("progress", (evt) => {
       if (evt.lengthComputable) {
@@ -144,8 +152,15 @@ function DirectoryView() {
       }
     });
 
-    xhr.onload = () => {
+    xhr.onload = async () => {
       // Clear upload state and refresh directory
+      if (xhr.status == 200) {
+        const data = await uploadComplete(fileId)
+        console.log(data)
+      } else {
+        setErrorMessage("File not uploaded!");
+        setTimeout(() => setErrorMessage(""), 3000);
+      }
       setUploadItem(null);
       loadDirectory();
     };
@@ -255,7 +270,7 @@ function DirectoryView() {
       <div className="mx-2 md:mx-4">
         {errorMessage &&
           errorMessage !==
-            "Directory not found or you do not have access to it!" && (
+          "Directory not found or you do not have access to it!" && (
             <div className="error-message text-red-500 text-xs text-center mt-1">
               {errorMessage}
             </div>
@@ -298,7 +313,7 @@ function DirectoryView() {
 
         {combinedItems.length === 0 ? (
           errorMessage ===
-          "Directory not found or you do not have access to it!" ? (
+            "Directory not found or you do not have access to it!" ? (
             <p className="text-center text-gray-600 mt-4 italic">
               Directory not found or you do not have access to it!
             </p>

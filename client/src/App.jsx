@@ -6,6 +6,7 @@ import Login from "./Login";
 import UsersPage from "./UsersPage";
 import Error from "./components/Error";
 import Converter from "./components/Converter";
+import Plans from "./Plans";
 
 const router = createBrowserRouter([
   {
@@ -34,8 +35,12 @@ const router = createBrowserRouter([
   },
   {
     path: "/error",
-    element: <Error/>
-  }
+    element: <Error />
+  },
+  {
+    path: "/plans",
+    element: <Plans />,
+  },
 ]);
 
 function App() {

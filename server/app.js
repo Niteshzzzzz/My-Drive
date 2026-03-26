@@ -6,12 +6,13 @@ import directoryRoutes from "./routes/directoryRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import webhookRoutes from "./routes/webhookRoutes.js";
 import checkAuth from "./middlewares/authMiddleware.js";
 import { connectDB } from "./config/db.js";
 import { connectRedis } from "./config/redis.js";
 import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
-import { set } from "mongoose";
+import subscriptionController from './routes/subscriptionRoutes.js'
 dotenv.config();
 const secretKey = process.env.COOKIE_SECRET || 'my_signed_cookie'
 
@@ -67,7 +68,9 @@ try {
 
   app.use("/directory", checkAuth, directoryRoutes);
   app.use("/file", checkAuth, fileRoutes);
+  app.use('/subscription', checkAuth, subscriptionController);
   app.use("/", userRoutes);
+  app.use("/webhook", webhookRoutes);
   app.use("/auth", authRoutes);
 
   app.use((err, req, res, next) => {
