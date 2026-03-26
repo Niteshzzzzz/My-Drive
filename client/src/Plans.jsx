@@ -247,8 +247,7 @@ export default function Plans() {
 
 function openRazorpayPopup({ subscriptionId }) {
   const rzp = new Razorpay({
-    // key: "rzp_live_SV4apMq8tbxeMh",
-    key: "rzp_test_SETsVXjJHUkFdG",
+    key: import.meta.env.VITE_RZP_KEY,
     description: "My first test payment.",
     name: "Storage App",
     subscription_id: subscriptionId,
