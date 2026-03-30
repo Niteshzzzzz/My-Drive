@@ -26,8 +26,8 @@ try {
   app.use(express.json());
   app.use(
     cors({
-      // origin: process.env.CORS_ORIGIN || ["http://localhost:5173", 'http://127.0.0.2:5500'],
-      origin: ["http://localhost:5173", 'http://127.0.0.2:5500'],
+      origin: process.env.CORS_ORIGIN || ["http://localhost:5173", 'http://127.0.0.2:5500'],
+      // origin: ["http://localhost:5173", 'http://127.0.0.2:5500'],
       credentials: true,
     })
   );
