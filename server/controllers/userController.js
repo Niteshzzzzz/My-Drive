@@ -132,7 +132,8 @@ export const login = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
       signed: true,
       maxAge: sessionExpiry * 1000
     });
@@ -184,7 +185,8 @@ export const loginWithGoogle = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
@@ -228,7 +230,8 @@ export const loginWithGoogle = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
@@ -330,7 +333,8 @@ export const gitHubCallback = async (req, res, next) => {
 
       res.cookie("sid", sessionId, {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'none',
+        secure: true,
         signed: true,
         maxAge: 60 * 1000 * 60 * 24 * 7,
       });
@@ -377,7 +381,8 @@ export const gitHubCallback = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none',
+      secure: true,
       signed: true,
       maxAge: 60 * 1000 * 60 * 24 * 7,
     });
