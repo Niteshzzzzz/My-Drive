@@ -1,5 +1,7 @@
 import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import dotenv from 'dotenv';
+dotenv.config();
 
 const s3Client = new S3Client({
     // profile: 'storageApp',

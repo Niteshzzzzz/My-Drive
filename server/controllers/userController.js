@@ -132,6 +132,7 @@ export const login = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
+      // sameSite: 'lax',
       sameSite: 'none',
       secure: true,
       signed: true,
@@ -185,6 +186,7 @@ export const loginWithGoogle = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
+      // sameSite: 'lax',
       sameSite: 'none',
       secure: true,
       signed: true,
@@ -230,6 +232,7 @@ export const loginWithGoogle = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
+      // sameSite: 'lax',
       sameSite: 'none',
       secure: true,
       signed: true,
@@ -333,6 +336,7 @@ export const gitHubCallback = async (req, res, next) => {
 
       res.cookie("sid", sessionId, {
         httpOnly: true,
+        // sameSite: 'lax',
         sameSite: 'none',
         secure: true,
         signed: true,
@@ -381,6 +385,7 @@ export const gitHubCallback = async (req, res, next) => {
 
     res.cookie("sid", sessionId, {
       httpOnly: true,
+      // sameSite: 'lax',
       sameSite: 'none',
       secure: true,
       signed: true,

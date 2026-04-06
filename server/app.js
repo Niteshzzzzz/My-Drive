@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from 'dotenv';
 import directoryRoutes from "./routes/directoryRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -13,6 +12,7 @@ import { connectRedis } from "./config/redis.js";
 import { rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 import subscriptionController from './routes/subscriptionRoutes.js'
+import dotenv from 'dotenv';
 dotenv.config();
 const secretKey = process.env.COOKIE_SECRET || 'my_signed_cookie'
 
