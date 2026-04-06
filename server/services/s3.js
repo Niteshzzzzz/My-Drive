@@ -2,7 +2,8 @@ import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObject
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const s3Client = new S3Client({
-    profile: 'storageApp'
+    profile: 'storageApp',
+    region: 'ap-south-1',
 })
 
 export const createUploadSignedUrl = async (key, contentType) => {
